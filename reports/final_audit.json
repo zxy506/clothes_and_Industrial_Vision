@@ -1,0 +1,54 @@
+{
+  "split": {
+    "fashion_train": 5000,
+    "fashion_validation": 5000,
+    "fashion_test": 10000,
+    "neu_train": 1080,
+    "neu_validation": 360,
+    "neu_test": 360,
+    "neu_small_train": 540
+  },
+  "protocol_hash_matches": {
+    "fashion": {
+      "split_sha256": true,
+      "config_sha256": true,
+      "cnn_source_sha256": false,
+      "train_source_sha256": true,
+      "cvae_sha256": true,
+      "frozen_cnn_snapshot_sha256": true
+    },
+    "neu": {
+      "split_sha256": true,
+      "config_sha256": true,
+      "cnn_source_sha256": true,
+      "cvae_source_sha256": true,
+      "train_source_sha256": true,
+      "cvae_checkpoint_sha256": true
+    }
+  },
+  "fashion": {
+    "runs_checked": 12,
+    "test_images_per_run": 10000,
+    "modes": [
+      "A",
+      "B",
+      "C25",
+      "C"
+    ]
+  },
+  "neu": {
+    "runs_checked": 9,
+    "test_images_per_run": 360,
+    "modes": [
+      "A",
+      "B",
+      "C"
+    ]
+  },
+  "rerun_inference": {
+    "device": "cuda",
+    "fashion_B_seed0_clean_exact_match": true,
+    "fashion_B_seed0_noisy_exact_match": true,
+    "neu_B_seed0_exact_match": true
+  }
+}

@@ -1,0 +1,24 @@
+dataset:
+  name: neu_cls
+  root: data/raw/neu_cls
+  split_seed: 20261119
+  classes: [Cr, In, Pa, PS, RS, Sc]
+  train_per_class: 180
+  val_per_class: 60
+  test_per_class: 60
+  small_train_per_class: 90
+  image_size: 128
+training:
+  seeds: [0, 1, 2]
+  batch_size: 32
+  learning_rate: 0.001
+  optimizer: adam
+  epochs: 40
+cvae:
+  latent_dim: 64
+  beta: 1.0
+  reconstruction_reduction: sum_per_image_then_mean_batch
+augmentation:
+  rotation_degrees: 5
+  affine_fill: 0.5
+  horizontal_flip_probability: 0.5

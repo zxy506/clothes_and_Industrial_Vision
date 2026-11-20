@@ -1,0 +1,90 @@
+{
+  "device": "cuda",
+  "timing_scope": "model loops; excludes Python startup and data loading",
+  "cnn_training": {
+    "A": {
+      "seconds_by_seed": [
+        4.952,
+        4.964,
+        4.974
+      ],
+      "seconds_mean": 4.963333333333334,
+      "gpu_peak_allocated_bytes_by_seed": [
+        85378560,
+        86918656,
+        86918656
+      ]
+    },
+    "B": {
+      "seconds_by_seed": [
+        6.401,
+        6.338,
+        6.354
+      ],
+      "seconds_mean": 6.364333333333334,
+      "gpu_peak_allocated_bytes_by_seed": [
+        85763584,
+        87303680,
+        87303680
+      ]
+    },
+    "C25": {
+      "seconds_by_seed": [
+        5.269,
+        5.102,
+        4.638
+      ],
+      "seconds_mean": 5.003,
+      "gpu_peak_allocated_bytes_by_seed": [
+        86148608,
+        86148608,
+        87688704
+      ]
+    },
+    "C": {
+      "seconds_by_seed": [
+        4.903,
+        5.532,
+        4.7
+      ],
+      "seconds_mean": 5.045,
+      "gpu_peak_allocated_bytes_by_seed": [
+        86533632,
+        86533632,
+        88073728
+      ]
+    }
+  },
+  "cnn_single_image_seconds_seed0": {
+    "A": 0.00041196549998858247,
+    "B": 0.00043205450001551073,
+    "C25": 0.00042061100000864824,
+    "C": 0.0004596470000251429
+  },
+  "cvae_training_seconds_seed0": 3.0,
+  "cvae_single_image_seconds_seed0": 0.00026608500000293136,
+  "cvae_generation_pool": {
+    "0": {
+      "images": 5000,
+      "labels_per_class": 500,
+      "generator_sha256": "a79aadf41e02646dc013a1c08287d617b42d83b52f9d3eb0feac6cd7bb04db43",
+      "sample_seed": 0,
+      "generation_seconds": 0.22623240000393707
+    },
+    "1": {
+      "images": 5000,
+      "labels_per_class": 500,
+      "generator_sha256": "a79aadf41e02646dc013a1c08287d617b42d83b52f9d3eb0feac6cd7bb04db43",
+      "sample_seed": 1,
+      "generation_seconds": 0.0827659999995376
+    },
+    "2": {
+      "images": 5000,
+      "labels_per_class": 500,
+      "generator_sha256": "a79aadf41e02646dc013a1c08287d617b42d83b52f9d3eb0feac6cd7bb04db43",
+      "sample_seed": 2,
+      "generation_seconds": 0.023320200001762714
+    }
+  },
+  "generation_single_image_estimate_note": "pool time / 5000 is batch throughput, not standalone latency"
+}

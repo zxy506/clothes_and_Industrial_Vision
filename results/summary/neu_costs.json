@@ -1,0 +1,76 @@
+{
+  "device": "cuda",
+  "timing_scope": "model loops; excludes process startup and data loading",
+  "cnn_training": {
+    "A": {
+      "seconds_by_seed": [
+        14.04,
+        13.687,
+        13.701
+      ],
+      "seconds_mean": 13.809333333333333,
+      "gpu_peak_allocated_bytes_by_seed": [
+        364401664,
+        364401664,
+        364401664
+      ]
+    },
+    "B": {
+      "seconds_by_seed": [
+        15.072,
+        15.115,
+        15.102
+      ],
+      "seconds_mean": 15.096333333333334,
+      "gpu_peak_allocated_bytes_by_seed": [
+        364401664,
+        364830720,
+        364830720
+      ]
+    },
+    "C": {
+      "seconds_by_seed": [
+        14.011,
+        13.977,
+        13.999
+      ],
+      "seconds_mean": 13.995666666666667,
+      "gpu_peak_allocated_bytes_by_seed": [
+        364830720,
+        365259776,
+        365259776
+      ]
+    }
+  },
+  "cnn_single_image_seconds_seed0": {
+    "A": 0.0003721265000058338,
+    "B": 0.00035293900000397114,
+    "C": 0.0003646410000146716
+  },
+  "cvae_training_seconds": 9.737,
+  "cvae_gpu_peak_allocated_bytes": 108827136,
+  "cvae_single_image_seconds": 0.0003668810000090161,
+  "cvae_generation_pools": {
+    "0": {
+      "images": 540,
+      "labels_per_class": 90,
+      "seed": 0,
+      "generator_sha256": "1223c7866258a4b066ca4c158c89d4d0a28039dea6e1494acbdf90b43d3c3dc7",
+      "generation_seconds": 0.27312150000216207
+    },
+    "1": {
+      "images": 540,
+      "labels_per_class": 90,
+      "seed": 1,
+      "generator_sha256": "1223c7866258a4b066ca4c158c89d4d0a28039dea6e1494acbdf90b43d3c3dc7",
+      "generation_seconds": 0.11140249999880325
+    },
+    "2": {
+      "images": 540,
+      "labels_per_class": 90,
+      "seed": 2,
+      "generator_sha256": "1223c7866258a4b066ca4c158c89d4d0a28039dea6e1494acbdf90b43d3c3dc7",
+      "generation_seconds": 0.04822710000007646
+    }
+  }
+}

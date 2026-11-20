@@ -1,0 +1,26 @@
+{
+  "A": {
+    "best_validation_accuracy": 0.8194,
+    "best_epoch": 9,
+    "final_epoch": 10,
+    "updates_per_epoch": 40,
+    "seed": 0,
+    "status": "preliminary; not final test result"
+  },
+  "B": {
+    "best_validation_accuracy": 0.8048,
+    "best_epoch": 8,
+    "final_epoch": 10,
+    "updates_per_epoch": 40,
+    "seed": 0,
+    "status": "preliminary; not final test result"
+  },
+  "C": {
+    "best_validation_accuracy": 0.7878,
+    "best_epoch": 9,
+    "final_epoch": 10,
+    "updates_per_epoch": 40,
+    "seed": 0,
+    "status": "preliminary; not final test result"
+  }
+}

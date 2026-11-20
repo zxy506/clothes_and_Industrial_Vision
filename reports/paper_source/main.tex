@@ -1,0 +1,165 @@
+\documentclass{article}
+% Official NeurIPS 2026 style; preprint mode is used for this course report.
+% This work is not a NeurIPS submission or accepted paper.
+\usepackage[preprint,nonatbib]{neurips_2026}
+\usepackage{fontspec}
+\usepackage{xeCJK}
+\setCJKmainfont{Microsoft YaHei}
+\usepackage{amsmath,amssymb,booktabs,graphicx,multirow}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\graphicspath{{../../results/figures/}}
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue}
+\newcommand{\acc}{\mathrm{Acc}}
+\newcommand{\mf}{\mathrm{MacroF1}}
+\newcommand{\std}{\mathrm{SD}}
+\title{条件变分自编码器能改善小样本图像分类吗？\\Fashion-MNIST 与钢材表面缺陷的对照实验}
+\author{智新宇\\\texttt{Industrial Vision}\thanks{课程实验报告；使用 NeurIPS 2026 官方排版样式，未向 NeurIPS 投稿。}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+我们研究小样本训练中，条件变分自编码器（CVAE）生成图像是否比真实样本和常规增强更有利于分类。Fashion-MNIST 每类取 500 张训练、500 张验证，使用完整官方测试集；NEU-CLS 六类钢材表面缺陷各取 90 张小样本训练、60 张验证、60 张测试。两个数据集分别训练卷积分类器和 CVAE，在固定数据划分、统一分类器与更新次数下比较真实样本（A）、常规增强（B）与 50\% CVAE 生成样本（C）；Fashion 另测 25\% 生成比例。三个随机种子的独立测试显示，Fashion 的 A/B/C50 Accuracy 分别为 $0.8365\pm0.0110$、$0.8442\pm0.0026$、$0.8155\pm0.0024$；NEU 的对应结果为 $0.9731\pm0.0085$、$0.9769\pm0.0098$、$0.9343\pm0.0098$。本实现的 CVAE 在两项任务的干净测试集上均未带来收益，且 NEU 生成图的细纹理明显模糊。我们保留负结果、失败案例与计算成本，并提供使用真实权重的本地演示软件。结论只适用于本实验的模型、数据划分与生成比例。
+\end{abstract}
+
+\section{引言}
+工业表面缺陷样本的采集与标注可能受生产条件制约。生成式增强的直觉是以已标注的少量真实图片学习类条件分布，再生成带类别的额外训练样本。然而，生成图片若丢失细微纹理，额外数量也可能使分类边界变差。我们把问题具体化为：在分类器架构、优化器和训练更新次数一致时，以 CVAE 生成图替代部分真实样本，是否优于常规增强？
+
+课程主实验使用 Fashion-MNIST\cite{fashionmnist}，工业应用使用东北大学 NEU-CLS\cite{neusource}。两套网络和权重独立训练，不把服饰模型用于钢材识别。本文贡献是一个可追溯的对照：固定划分与测试规则，三种子报告均值及样本标准差，包含生成比例消融、固定噪声测试、逐类分析、失败案例和成本。全部正式数值来自项目的原始预测及日志，并在最终审计中重新计算。
+
+\section{相关工作}
+变分自编码器通过可微重参数化优化变分下界，在连续潜变量模型中实现近似推断\cite{kingma2014}。条件生成模型把附加信息并入推断和生成路径，使输出可按条件采样\cite{sohn2015}。本文使用类别作为条件，并用采样图像扩充分类训练；其效果需要以同一分类器上的测试性能验证，不能只凭样本网格判断。Fashion-MNIST 提供固定的 28$\times$28 十类灰度测试集\cite{fashionmnist}；NEU 官方数据页说明六类钢材缺陷，每类 300 张、原始 200$\times$200 灰度图\cite{neusource}。本文使用图像级 NEU-CLS 标签，不进行缺陷定位。
+
+\section{方法}
+\subsection{数据与模型}
+Fashion 的官方训练集中按固定种子逐类选 500 张训练、500 张验证，完整保留 10,000 张官方测试图。NEU-CLS 每类 300 张，固定划分为训练 180、验证 60、测试 60；训练中的前 90 张/类构成主实验的 \texttt{small\_train}（540 张），其余训练图不进入主实验。NEU 图像统一变为 128$\times$128 灰度。两种数据的划分清单和来源哈希保存在项目中；训练、验证和测试路径无交叉。
+
+Fashion 分类器是自实现三段卷积、批归一化、池化及全局平均汇聚的轻量 CNN。NEU 分类器独立定义，末端空间汇聚到 4$\times$4，以保留更多纹理位置特征。两者均用交叉熵训练。Fashion CVAE 以 32 维潜变量和两层下采样/上采样卷积生成 28$\times$28 图像；NEU CVAE 使用 64 维潜变量和四层卷积生成 128$\times$128 图像。类别 one-hot 图在编码器输入处与图像拼接，类别 one-hot 向量在解码器输入处与潜变量拼接。生成时从标准正态分布抽样 $z$，指定类别 $y$，输出 $\hat{x}=D_\theta(z,y)$。
+
+\subsection{CVAE 目标及训练对照}
+对每张图的像素二元交叉熵求和，对潜变量 KL 散度求和，再按批平均：
+\begin{equation}
+\mathcal{L}=\mathbb{E}_{q_\phi(z\mid x,y)}[-\log p_\theta(x\mid z,y)]
++\beta D_{\mathrm{KL}}\!\left(q_\phi(z\mid x,y)\|\mathcal{N}(0,I)\right),\qquad \beta=1.
+\end{equation}
+Fashion CVAE 只在 5,000 张训练图上训练 20 轮；NEU CVAE 只在 540 张小样本训练图上训练 40 轮。分类对照定义为 A：100\% 真实图；B：50\% 真实图加 50\% 常规增强图；C：50\% 真实图加 50\% CVAE 生成图。Fashion 还设 C25：75\% 真实图加 25\% 生成图。B 与 C 的真实样本流和类别流按正式协议控制；三组不使用验证或测试图合成数据。B 的 Fashion 增强使用小幅旋转、平移与缩放；NEU 使用 $\pm5^\circ$ 旋转、中灰边界填充及概率 0.5 的水平翻转。
+
+\section{实验设置}
+Fashion 分类训练采用 Adam、学习率 $10^{-3}$、批大小 128，所有模式和种子均训练 30 轮、每轮 40 次更新。NEU 采用 Adam、学习率 $10^{-3}$、批大小 32，均训练 40 轮、每轮 17 次更新。随机种子为 0、1、2；每次仅根据验证 Accuracy 选择最佳轮次。训练全部完成后才评价独立测试集。正式协议在测试前冻结数据清单、配置、关键代码及 CVAE 权重的 SHA-256。报告以三个种子的算术均值和样本标准差（$\mathrm{ddof}=1$）表示结果。
+
+评价使用 Accuracy 和 Macro-F1。前者是正确预测比例；后者先按类别计算 $F1_c=2P_cR_c/(P_c+R_c)$，再对类别等权平均，避免只观察整体正确率。Fashion 另在相同测试图上加固定标准差 $\sigma=0.15$ 的高斯噪声，裁剪到 $[0,1]$，所有模型使用同一组噪声图。成本计时只包含模型循环，不含 Python 启动及数据加载；GPU 峰值指标是张量分配量，不代表整卡占用。
+
+\section{结果与分析}
+\subsection{Fashion-MNIST 课程实验}
+\begin{table}[t]
+\centering\small
+\caption{Fashion 官方测试集结果，三种子均值 $\pm$ 样本标准差。C25 与 C50 分别表示生成图占 25\% 和 50\%。}
+\label{tab:fashion}
+\begin{tabular}{lcccc}\toprule
+模式 & 干净 Acc & 干净 Macro-F1 & 加噪 Acc & 加噪 Macro-F1 \\\midrule
+A & .8365 $\pm$ .0110 & .8350 $\pm$ .0098 & .3985 $\pm$ .0937 & .3576 $\pm$ .1173 \\
+B & .8442 $\pm$ .0026 & .8454 $\pm$ .0022 & .4445 $\pm$ .0324 & .4177 $\pm$ .0621 \\
+C25 & .8301 $\pm$ .0049 & .8290 $\pm$ .0063 & .3740 $\pm$ .1234 & .3403 $\pm$ .1303 \\
+C50 & .8155 $\pm$ .0024 & .8147 $\pm$ .0006 & .4470 $\pm$ .0640 & .4166 $\pm$ .0736 \\\bottomrule
+\end{tabular}
+\end{table}
+
+表\ref{tab:fashion}显示，B 的干净集 Accuracy 比 A 高 0.0077；C25 和 C50 分别比 A 低 0.0064 和 0.0210。图\ref{fig:fashion}显示生成比例从 0\% 到 50\% 时干净集均值下降。C50 的加噪 Accuracy 均值高于 A 0.0485，但种子间波动较大，同时干净集更差，不能概括为生成式增强提高鲁棒性。固定噪声使全部模式明显退化；本实验只测一种噪声强度。图\ref{fig:noise}并列展示干净与加噪指标：C50 的加噪 Accuracy 与 B 的 0.4445 接近，而 Macro-F1 的 0.4166 略低于 B 的 0.4177。仅挑选一个总体指标会误读结果，因此同时报告这两项指标及波动。
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=.72\linewidth]{fashion_final_ablation.png}
+\caption{Fashion 生成比例消融。图源：三个种子的正式独立测试结果；误差棒与原始逐次指标见 \texttt{results/summary/fashion\_final.json}。}
+\label{fig:fashion}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=.78\linewidth]{fashion_final_robustness.png}
+\caption{Fashion 固定高斯噪声 $\sigma=0.15$ 下的性能变化。每个模式均评价同一批官方测试图与同一份固定噪声；原始预测位于 \texttt{results/raw/fashion\_final/}。}
+\label{fig:noise}
+\end{figure}
+
+逐类召回率揭示平均数背后的变化：C50 相对 A 对 Pullover（类别 2）高约 0.044，对 T-shirt/top（类别 0）和 Shirt（类别 6）分别低约 0.113 和 0.062。B 对 Coat、Shirt 的召回率较高。按预定规则从 seed 0 官方测试集中逐类别选取 A 正确而 C50 错误的最小索引，三个案例分别是 Pullover$\to$Shirt、Coat$\to$Pullover、Sandal$\to$Sneaker（索引 136、6、21；按类别分别列出）。图\ref{fig:fashionfail}呈现原图与预测。生成网格中部分衣服边缘及鞋面结构模糊，是候选解释，但这些个例不能证明因果。尤其 Pullover 类 C50 的总体召回率反而高于 A，个例分析不可取代总体统计。
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=.9\linewidth]{fashion_final_failures.png}
+\caption{Fashion 官方测试集三个 A 正确而 C50 错误的案例。选择规则和索引保存于 \texttt{results/raw/fashion\_final\_failures.json}。}
+\label{fig:fashionfail}
+\end{figure}
+
+\subsection{NEU-CLS 工业实验}
+\begin{table}[t]
+\centering\small
+\caption{NEU-CLS 独立 360 张测试图，三种子均值 $\pm$ 样本标准差。每次训练仅使用 90 张/类真实图。}
+\label{tab:neu}
+\begin{tabular}{lcc}\toprule
+模式 & Accuracy & Macro-F1 \\\midrule
+A 真实 & .9731 $\pm$ .0085 & .9732 $\pm$ .0084 \\
+B 常规增强 & .9769 $\pm$ .0098 & .9770 $\pm$ .0096 \\
+C CVAE 增强 & .9343 $\pm$ .0098 & .9343 $\pm$ .0095 \\\bottomrule
+\end{tabular}
+\end{table}
+
+NEU 的 B 比 A 平均仅高 0.0038 Accuracy，三个种子中并非每次都高；C 比 A 低 0.0388。图\ref{fig:neurecall}展示六类召回率。C 对斑块（Pa）、划痕（Sc）、夹杂（In）的平均召回率相对 A 分别低约 0.083、0.061、0.056；龟裂（Cr）则由 A 的 0.994 升至 1.000，但在每类仅 60 张测试图、三种子的设置下不能据此判断稳定增益。RS 类三组均接近满分，说明平均性能变化并非来自所有类别同等退化。逐次混淆矩阵支持查看具体误判方向。图\ref{fig:neu}中 CVAE 样本多保留亮暗块，却弱化了龟裂细线、麻点颗粒和划痕方向等高频纹理。像素最近邻只用于外观比较，不能当作生成图的语义标签。
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=.82\linewidth]{neu_final_recall.png}
+\caption{NEU 六类召回率的三种子汇总，来自固定独立测试。类别中文名与代码在数据清单和软件界面中一致。}
+\label{fig:neurecall}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=.67\linewidth]{neu_cvae_diagnostic.png}
+\caption{NEU 六类真实小样本、按类生成图与训练集像素最近邻。图源：\texttt{results/raw/neu\_cvae\_nearest.json} 和已保存的 CVAE 权重。}
+\label{fig:neu}
+\end{figure}
+
+三个固定规则选出的工业失败案例是 \texttt{In\_248.bmp}（夹杂误判麻点）、\texttt{Pa\_147.bmp}（斑块误判麻点）和 \texttt{PS\_90.bmp}（麻点误判夹杂）：seed 0 的 A 均正确、C 均错误。图\ref{fig:fail}列出实际测试图。它们与逐类召回率的方向一致，但不证明某张生成图导致某个错误。随机图像级划分也可能使不同集合共享采集环境和相似纹理；我们已检查文件路径及跨划分原始图像 SHA-256，无完全重复。
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=.9\linewidth]{neu_final_failures.png}
+\caption{三个真实 NEU 测试失败案例。选择规则与预测记录见 \texttt{results/raw/neu\_final\_failures.json}。}
+\label{fig:fail}
+\end{figure}
+
+\subsection{计算成本}
+在 RTX 4060 Laptop GPU 上，Fashion 的 CNN 30 轮模型循环平均耗时 A/B/C25/C50 分别为 4.96/6.36/5.00/5.05 秒，CVAE 20 轮约 3.0 秒。NEU 的 CNN 40 轮平均耗时 A/B/C 为 13.81/15.10/14.00 秒，CVAE 40 轮为 9.74 秒。NEU 每个 540 张生成池耗时 0.048--0.273 秒，受预热影响。若只比较分类器循环，C 的时间与 A 相近；完整生成式方案还须承担 CVAE 训练和生成成本。本实验的计时范围和单张推理记录保存在成本 JSON 中，不将其当作端到端生产线吞吐量。
+
+\section{工业应用与实现}
+本地 Streamlit 软件提供工业缺陷与衣物识别、条件生成、正式实验图表、SQLite 历史和设置页。工业识别调用 NEU CNN 权重，衣物识别调用独立的 Fashion CNN 正式权重，生成调用 NEU CVAE 权重；模型加载缓存，输出记录权重哈希前缀以标识版本。上传 PNG/JPEG/BMP 图像分别转为工业 128$\times$128 或衣物 28$\times$28 灰度图，单次最多处理 50 张、单张上限 20 MB。生成图与元数据及 SQLite 历史均保存在项目目录；不依赖外部 API。软件仅预测整图类别，没有定位框，不能将概率解释为经过现场校准的可靠度。衣物模型主要适用于 Fashion-MNIST 风格的黑底单件衣物图，普通照片存在明显分布差异。演示可使用两个独立测试集的样本，或指定类别与种子生成工业合成图。
+
+最终审计重新计算了 Fashion 12 次与 NEU 9 次测试的 Accuracy、Macro-F1、召回率、混淆矩阵、三种子均值与标准差，并从权重重新推理 Fashion B/seed 0 的干净及加噪测试图、NEU B/seed 0 的测试图；预测与已存结果逐项一致。Fashion 冻结协议中的 CNN 源文件哈希与当前共享文件不同，因为后续加入了 NEU 分类器定义。我们从当前文件中恢复了追加前的 Fashion 模型源码，单独存档，其 SHA-256 与冻结协议完全一致；训练代码、配置、划分、CVAE 权重及全部测试权重哈希也匹配。此源码历史差异和恢复结果均保留在审计记录中。
+
+\section{局限与结论}
+本实验仅测试一套轻量 CNN、一套数据集专用 CVAE、固定生成比例和三颗随机种子，未测更大生成模型、生成质量筛选或更系统的调参。NEU 测试集仅 360 张，随机图像级划分不足以证明跨设备、跨批次或跨工厂泛化。Fashion 的加噪结论仅适用于 $\sigma=0.15$ 的固定高斯噪声。正式结果表明，此实现中的 CVAE 替代真实图像削弱了两个任务的干净集分类效果；常规增强在均值上更好，但 NEU 的增益较小。生成质量与类别可辨性应作为后续改进重点，而非把更多合成图直接视为更好训练数据。
+
+\paragraph{如何解释负结果。}CVAE 的像素级重建目标倾向于压低不稳定的高频细节；图\ref{fig:neu}中钢材细纹理的消失与这一机制相容。与此同时，分类器的有效训练分布、真实样本重复采样、生成标签的可辨性等因素也可能影响 C 组。现有实验证实的是整套 C 方案在本协议下低于 A，而不是某一个具体缺陷由某张生成图造成。最近邻检查没有发现明显逐像素复制，但也不能用它证明生成分布足够真实。Fashion 的 C25 和 C50 呈现剂量相关的均值下降，为生成样本比例可能有害提供进一步证据；这仍不足以将结果外推到别的 CVAE 架构。
+
+\paragraph{统计与场景边界。}每个模式只有三颗训练种子，标准差用于描述本次随机性，不等于置信区间，也未进行显著性检验。NEU B 与 A 的平均差距不足 0.4 个百分点，因此不宜据此宣布稳定优势。工业原图来自同一公开数据库，六类都有缺陷；软件上传一张无缺陷图片时仍会输出六类之一，因为模型没有“正常”类或拒识阈值。模型概率没有经过温度校准，接近 100\% 的 softmax 值不能代替对实际风险的校准评估。真实生产部署还需要无缺陷类、未知缺陷拒识、采集条件变化和误报漏报成本评估。
+
+\paragraph{下一步实验。}可优先在不触碰独立测试集的前提下，基于训练集和验证集检查生成图的类别可辨性，比较不同生成比例、潜在维度和重建权重，并用纹理敏感的质量指标筛除明显失真的样本。若获取新的采集批次，应将其作为全新的外部测试集，而不是继续依据现有测试图调参。最终是否使用生成式增强，应以预先冻结的外部评价和实际业务成本决定。
+
+\paragraph{数据与 AI 辅助说明。}Fashion-MNIST 通过 torchvision 官方接口获取；NEU-CLS 从东北大学官方页面所列入口获取。NEU 官方页面未明确列出完整再分发许可，因此原始图像和演示样本不作为公开附件打包。代码、实验脚本、分析与本文初稿由 Codex 辅助实现和撰写，所有报告数值来自本地实跑记录与再次核验；作者应在提交前审核文字、引用和课程要求。课程答辩 PPT 由用户自行制作。
+
+\clearpage
+\begin{thebibliography}{9}
+\bibitem{kingma2014} D. P. Kingma and M. Welling. Auto-Encoding Variational Bayes. \emph{International Conference on Learning Representations}, 2014. \url{https://arxiv.org/abs/1312.6114}.
+\bibitem{sohn2015} K. Sohn, X. Yan, and H. Lee. Learning Structured Output Representation using Deep Conditional Generative Models. \emph{Advances in Neural Information Processing Systems 28}, 2015. \url{https://papers.nips.cc/paper_files/paper/2015/hash/8d55a249e6baa5c06772297520da2051-Abstract.html}.
+\bibitem{fashionmnist} H. Xiao, K. Rasul, and R. Vollgraf. Fashion-MNIST: a Novel Image Dataset for Benchmarking Machine Learning Algorithms. arXiv:1708.07747, 2017. \url{https://arxiv.org/abs/1708.07747}.
+\bibitem{neusource} K. Song. NEU surface defect database. Northeastern University official data page. \url{https://faculty.neu.edu.cn/songkechen/zh_CN/zdylm/263270/list/index.htm}. Accessed 2026-11-19.
+\end{thebibliography}
+
+\appendix
+\section{复现路径和报告检查清单}
+\begin{itemize}
+\item \textbf{可复现性：}项目中的 \texttt{configs/}、\texttt{data/splits/}、\texttt{checkpoints/}、\texttt{logs/}、\texttt{results/raw/} 与 \texttt{results/summary/} 分别保存配置、固定划分、权重、逐轮日志、逐次预测和统计汇总。\texttt{scripts/final\_audit.py} 只读重算正式结果，写出单独的审计 JSON。
+\item \textbf{评价和限制：}独立测试集未用于训练或挑选轮次；三种子样本标准差已给出；保留 CVAE 负结果、逐类指标、失败案例和计算成本。工业泛化、生成图语义质量与概率校准未得到验证。
+\item \textbf{伦理和许可：}报告使用公开说明的数据集；NEU 原图不公开再分发。本项目为图像级研究演示，不承担现场安全检测决策。
+\end{itemize}
+\end{document}

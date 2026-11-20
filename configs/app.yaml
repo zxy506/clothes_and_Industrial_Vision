@@ -1,0 +1,5 @@
+app:
+  name: Industrial Vision
+  language: zh_CN
+  database: database/history.db
+  default_device: auto

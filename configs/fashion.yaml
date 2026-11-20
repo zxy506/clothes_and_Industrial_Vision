@@ -1,0 +1,26 @@
+dataset:
+  name: fashion_mnist
+  root: data/raw/fashion_mnist
+  split_seed: 20261119
+  train_per_class: 500
+  val_per_class: 500
+  classes: 10
+  image_size: 28
+training:
+  seeds: [0, 1, 2]
+  batch_size: 128
+  learning_rate: 0.001
+  optimizer: adam
+  epochs: 30
+  early_stopping_patience: 5
+  proportions: [0.0, 0.25, 0.5]
+cvae:
+  latent_dim: 32
+  beta: 1.0
+  reconstruction_reduction: sum_per_image_then_mean_batch
+augmentation:
+  rotation_degrees: 10
+  translation_fraction: 0.05
+  scale_range: [0.95, 1.05]
+robustness:
+  gaussian_sigma: 0.15
